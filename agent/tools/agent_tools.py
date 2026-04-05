@@ -58,7 +58,7 @@ def get_user_location() -> str:
 
 @tool(description="Obtain the user id, return in string format")
 def get_user_id() -> str:
-    return str(random.randint(1000, 9999))
+    return random.choice(user_ids)
 
 
 @tool(
