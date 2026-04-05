@@ -1,0 +1,2 @@
+chat_model_name: claude-sonnet-4-6
+embedding_model_name: text-embedding-3-small

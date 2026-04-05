@@ -1,0 +1,135 @@
+aiohappyeyeballs==2.6.1
+aiohttp==3.13.3
+aiosignal==1.4.0
+altair==6.0.0
+annotated-types @ file:///home/task_176174488044141/conda-bld/annotated-types_1761744921564/work
+anthropic==0.86.0
+anyio @ file:///home/task_177313440367069/croot/anyio_1773134426302/work
+attrs==26.1.0
+backoff==2.2.1
+blinker==1.9.0
+cachetools==7.0.5
+certifi==2026.2.25
+cffi @ file:///home/task_176183215827778/conda-bld/cffi_1761832774246/work
+charset-normalizer==3.4.6
+chroma-hnswlib==0.7.6
+chromadb==1.5.5
+click==8.3.1
+coloredlogs==15.0.1
+dataclasses-json==0.6.7
+distro @ file:///croot/distro_1714488253808/work
+docstring_parser==0.17.0
+durationpy==0.10
+exceptiongroup @ file:///home/task_176156033398806/conda-bld/exceptiongroup_1761560346388/work
+fastapi==0.115.6
+filelock==3.25.2
+flatbuffers==25.12.19
+frozenlist==1.8.0
+fsspec==2026.2.0
+googleapis-common-protos==1.73.1
+greenlet==3.3.2
+grpcio==1.78.0
+h11 @ file:///home/task_176193128294608/conda-bld/h11_1761931294516/work
+httpcore @ file:///croot/httpcore_1748526048470/work
+httptools==0.7.1
+httpx @ file:///home/task_176044729065927/conda-bld/httpx_1760447346377/work
+httpx-sse==0.4.3
+huggingface_hub==1.8.0
+humanfriendly==10.0
+idna==3.11
+importlib_metadata==8.7.1
+importlib_resources==6.5.2
+Jinja2==3.1.6
+jiter @ file:///home/task_176289732642713/conda-bld/jiter_1762897374510/work
+jsonpatch @ file:///croot/jsonpatch_1714483231291/work
+jsonpointer @ file:///home/task_177443283227270/croot/jsonpointer_1774432868794/work
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+langchain==1.2.15
+langchain-anthropic==1.4.0
+langchain-chroma==1.1.0
+langchain-classic==1.0.3
+langchain-community==0.4.1
+langchain-core==1.2.26
+langchain-openai @ file:///home/task_176953174190370/croot/langchain-openai_1769532142232/work
+langchain-text-splitters==1.1.1
+langgraph==1.1.6
+langgraph-checkpoint==4.0.1
+langgraph-prebuilt==1.0.9
+langgraph-sdk==0.3.12
+langsmith @ file:///home/task_176788596388408/croot/langsmith_1767886030343/work
+markdown-it-py==4.0.0
+MarkupSafe==3.0.3
+marshmallow==3.26.2
+mdurl==0.1.2
+mmh3==5.2.1
+multidict==6.7.1
+mypy_extensions==1.1.0
+numpy==2.2.6
+openai @ file:///home/task_176716793518495/croot/openai_1767167955294/work
+opentelemetry-api==1.40.0
+opentelemetry-exporter-otlp-proto-common==1.40.0
+opentelemetry-exporter-otlp-proto-grpc==1.40.0
+opentelemetry-instrumentation==0.61b0
+opentelemetry-instrumentation-asgi==0.61b0
+opentelemetry-instrumentation-fastapi==0.61b0
+opentelemetry-proto==1.40.0
+opentelemetry-sdk==1.40.0
+opentelemetry-semantic-conventions==0.61b0
+opentelemetry-util-http==0.61b0
+orjson @ file:///home/task_177194589080018/croot/orjson_1771945915821/work
+ormsgpack==1.12.2
+overrides==7.7.0
+packaging @ file:///home/task_176104877067765/conda-bld/packaging_1761049113113/work
+pandas==2.3.3
+pillow==12.2.0
+posthog==7.9.12
+propcache==0.4.1
+protobuf==6.33.6
+pyarrow==23.0.1
+pycparser @ file:///home/task_175749556993857/conda-bld/pycparser_1757496041120/work
+pydantic==2.10.4
+pydantic-settings==2.13.1
+pydantic_core==2.27.2
+pydeck==0.9.1
+pypdf==6.9.2
+PyPika==0.51.1
+python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
+pytz==2026.1.post1
+PyYAML @ file:///home/task_176346546342115/conda-bld/pyyaml_1763465494987/work
+referencing==0.37.0
+regex @ file:///home/task_177265215662927/croot/regex_1772652256565/work
+requests==2.33.0
+requests-toolbelt @ file:///croot/requests-toolbelt_1690874004362/work
+rich==14.3.3
+rpds-py==0.30.0
+six==1.17.0
+sniffio @ file:///home/task_176432908282699/conda-bld/sniffio_1764329151716/work
+SQLAlchemy==2.0.36
+starlette==0.41.3
+streamlit==1.56.0
+tenacity @ file:///home/task_176718487322428/croot/tenacity_1767184891877/work
+tiktoken @ file:///home/task_176794779996369/croot/tiktoken_1767948183611/work
+tokenizers==0.22.2
+tomli==2.4.1
+tornado==6.5.5
+tqdm @ file:///home/task_177139829044356/croot/tqdm_1771398710408/work
+typer==0.24.1
+typing-inspect==0.9.0
+typing-inspection @ file:///home/task_176061351159976/conda-bld/typing-inspection_1760614166076/work
+typing_extensions @ file:///croot/typing_extensions_1756280817316/work
+tzdata==2026.1
+tzlocal==5.3.1
+urllib3==2.6.3
+uuid_utils @ file:///home/task_176778404752072/croot/uuid-utils_1767784506185/work
+uvicorn==0.34.0
+uvloop==0.22.1
+watchdog==6.0.0
+watchfiles==1.1.1
+websockets==16.0
+wrapt==1.17.3
+xxhash==3.6.0
+yarl==1.23.0
+zipp==3.23.0
+zstandard @ file:///home/task_175818879140268/conda-bld/zstandard_1758189073418/work
