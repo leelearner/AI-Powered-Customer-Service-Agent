@@ -31,9 +31,13 @@ class ReactAgent:
             middleware=[monitor_tool, log_before_model, report_prompt_switch],
         )
 
-    def execute_stream(self, query: str):
+    def execute_stream(self, query: str, metadata: dict):
         input_dict = {
             "messages": [
+                {
+                    "role": "system",
+                    "content": f"Current user's information: ip:{metadata.get('ip', 'unknown')}",
+                },
                 {"role": "user", "content": query},
             ]
         }
