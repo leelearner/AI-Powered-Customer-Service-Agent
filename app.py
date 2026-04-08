@@ -2,6 +2,17 @@ import time
 
 import streamlit as st
 from agent.react_agent import ReactAgent
+from streamlit_js_eval import streamlit_js_eval
+
+st.session_state["metadata"] = {}
+
+if "ip" not in st.session_state["metadata"]:
+    ip = streamlit_js_eval(
+        js_expressions="fetch('https://api.ipify.org?format=json').then(res => res.json()).then(data => data.ip)",
+        want_output=True,
+        key="get_ip",
+    )
+    st.session_state["metadata"]["ip"] = ip
 
 st.title("Agent customer service")
 st.divider()
@@ -23,7 +34,9 @@ if prompt:
 
     response_messages = []
     with st.spinner("Agent is thinking..."):
-        res_strem = st.session_state["agent"].execute_stream(prompt)
+        res_strem = st.session_state["agent"].execute_stream(
+            prompt, st.session_state["metadata"]
+        )
 
         def capture(generator, cache_list):
             for chunk in generator:
