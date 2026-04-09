@@ -1,7 +1,7 @@
 import time
 
 import streamlit as st
-from agent.react_agent import ReactAgent
+from agent.workflow import build_workflow
 from streamlit_js_eval import streamlit_js_eval
 
 st.session_state["metadata"] = {}
@@ -17,8 +17,8 @@ if "ip" not in st.session_state["metadata"]:
 st.title("Agent customer service")
 st.divider()
 
-if "agent" not in st.session_state:
-    st.session_state["agent"] = ReactAgent()
+if "workflow" not in st.session_state:
+    st.session_state["workflow"] = build_workflow()
 
 if "message" not in st.session_state:
     st.session_state["message"] = []
@@ -32,21 +32,22 @@ if prompt:
     st.chat_message("user").write(prompt)
     st.session_state["message"].append({"role": "user", "content": prompt})
 
-    response_messages = []
     with st.spinner("Agent is thinking..."):
-        res_strem = st.session_state["agent"].execute_stream(
-            prompt, st.session_state["metadata"]
-        )
+        initial_state = {
+            "query": prompt,
+            "ip": st.session_state["metadata"].get("ip", ""),
+        }
 
-        def capture(generator, cache_list):
-            for chunk in generator:
-                cache_list.append(chunk)
-                for char in chunk:
-                    time.sleep(0.01)  # Simulate delay for streaming effect
-                    yield char
+        result = st.session_state["workflow"].invoke(initial_state)
+        final_response = result.get("final_response", "无法生成回答，请重试。")
 
-        st.chat_message("assistant").write_stream(capture(res_strem, response_messages))
+        def stream_chars(text):
+            for char in text:
+                time.sleep(0.01)
+                yield char
+
+        st.chat_message("assistant").write_stream(stream_chars(final_response))
         st.session_state["message"].append(
-            {"role": "assistant", "content": response_messages[-1]}
+            {"role": "assistant", "content": final_response}
         )
         st.rerun()

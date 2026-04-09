@@ -44,7 +44,7 @@ def rag_summarize(query: str) -> str:
         "weather information of that city."
     )
 )
-def get_weather(city: str, lat: str, lon: str) -> str:
+def get_weather_tool(city: str, lat: str, lon: str) -> str:
     api_key = agent_conf.get("openweather_api_key", None)
     if not api_key or api_key.startswith("${"):
         logger.error("OpenWeather API key is not configured.")
@@ -71,15 +71,19 @@ def get_weather(city: str, lat: str, lon: str) -> str:
     "The input should be the user's IP address,"
     "and the output will be the 'city', 'lat' and 'lon' corresponding to that IP address.",
 )
-def get_user_location(ip: str) -> str:
+def get_user_location(ip: str) -> dict:
     resp = requests.get(f"http://ip-api.com/json/{ip}")
     data = resp.json()
-    res = f"city: {data.get('city', 'unknown')}, lat: {data.get('lat', 'unknown')}, lon: {data.get('lon', 'unknown')}"
+    res = {
+        "city": data.get("city", "unknown"),
+        "lat": data.get("lat", "unknown"),
+        "lon": data.get("lon", "unknown"),
+    }
     return res
 
 
 @tool(description="Obtain the user id, return in string format")
-def get_user_id() -> str:
+def get_user_id_tool() -> str:
     return random.choice(user_ids)
 
 

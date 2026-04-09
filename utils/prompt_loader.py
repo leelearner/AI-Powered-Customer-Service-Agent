@@ -56,7 +56,29 @@ def load_report_prompt() -> str:
         raise e
 
 
+def load_classification_prompt() -> str:
+    try:
+        classification_prompt_path = get_abs_path(
+            prompts_conf["classification_prompt_path"]
+        )
+    except KeyError as e:
+        logger.error(
+            f"[load_classification_prompt]Key {str(e)} not found in prompts configuration."
+        )
+        raise e
+
+    try:
+        with open(classification_prompt_path, "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError as e:
+        logger.error(
+            f"[load_classification_prompt]Error when parsing classification prompt, {str(e)}"
+        )
+        raise e
+
+
 if __name__ == "__main__":
     print(load_system_prompt())
     print(load_rag_prompt())
     print(load_report_prompt())
+    print(load_classification_prompt())
