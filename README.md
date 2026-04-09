@@ -1,11 +1,28 @@
 [English](README.md) | [中文](README_zh.md)
 # RAG + Agent Intelligent Q&A System
 
-An intelligent Q&A system built with LangChain Agent + RAG. Using a robot vacuum knowledge base as an example scenario, it demonstrates how to combine Retrieval-Augmented Generation (RAG) with a ReAct Agent to build a conversational assistant with tool calling, context awareness, and dynamic prompt switching capabilities.
+An intelligent Q&A system built with LangChain Agent + LangGraph + RAG. Using a robot vacuum knowledge base as an example scenario, it demonstrates how to combine Retrieval-Augmented Generation (RAG) with a Graph-based Agent workflow to build a conversational assistant with intent routing, tool calling, context awareness, and dynamic prompt switching capabilities.
+
+---
+
+## Architecture Overview
+
+The system uses a LangGraph StateGraph architecture, replacing the implicit tool calling chain of the original ReAct Agent with explicit graph nodes and edges, making execution paths controllable and auditable.
+
+![Workflow Graph](./graph.png)
+
+For detailed architecture design, see [graph_architecture.md](graph_architecture.md).
 
 ---
 
 ## Technical Highlights
+
+### LangGraph Workflow
+
+- Uses `StateGraph` to define nodes and edges; `intent_router` classifies user intent via LLM structured output
+- Four intent paths: weather query (`weather`), usage report (`report`), product knowledge (`product`), complex query (`complex`)
+- Dynamic routing via `Command(goto=...)`, supporting parallel node scheduling
+- All paths converge at the `synthesize` node for final response generation
 
 ### RAG Offline Document Ingestion
 
@@ -18,40 +35,31 @@ An intelligent Q&A system built with LangChain Agent + RAG. Using a robot vacuum
 
 - Each query retrieves Top-K relevant document chunks via ChromaDB retriever (K is configurable)
 - Retrieved results are concatenated into structured context, injected into the RAG Prompt Template, and the LLM generates the final answer
-- RAG capability is encapsulated as a LangChain `@tool` for on-demand invocation by the Agent
+- RAG capability is encapsulated as a LangChain `@tool`, invoked as the `rag` graph node on demand
 
-### LangChain Tool Definitions
+### Graph Nodes
 
-The Agent is equipped with the following tools:
-
-| Tool | Description |
+| Node | Description |
 |------|-------------|
-| `rag_summarize` | Retrieves from the knowledge base via RAG and generates a summarized answer |
-| `get_weather` | Fetches weather information for a specified city |
-| `get_user_location` | Gets the user's current city |
+| `intent_router` | LLM intent classification, dynamically routes to target nodes |
+| `get_location` | Gets user city/coordinates based on IP |
+| `get_weather` | Fetches weather information based on coordinates |
 | `get_user_id` | Gets the current user ID |
-| `get_current_month` | Gets the current month |
-| `fetch_external_data` | Reads external business data (CSV) based on user ID and month |
-| `fill_context_for_report` | Triggers the report mode context flag |
-
-### Middleware
-
-Cross-cutting logic is injected into the Agent's execution pipeline via the LangChain Agent Middleware mechanism:
-
-- **`monitor_tool`** (`@wrap_tool_call`): Intercepts all tool calls, logging tool names and input parameters; when `fill_context_for_report` is invoked, it writes a report flag to the runtime context
-- **`log_before_model`** (`@before_model`): Logs the current message count and the latest message content before each LLM call
-- **`report_prompt_switch`** (`@dynamic_prompt`): Dynamically switches the system prompt based on the `report` flag in the runtime context, enabling runtime switching between normal conversation and report generation modes
+| `get_month` | Gets the current month |
+| `fetch_data` | Reads external business data (CSV), triggers report mode |
+| `rag` | Retrieves from knowledge base via RAG and generates summary |
+| `synthesize` | Aggregates all context, switches prompt based on intent, generates final response |
 
 ### RAG and Agent Integration
 
-`rag_summarize` is registered as a regular tool for the Agent, which autonomously decides whether to query the knowledge base during reasoning. This design allows RAG and other tools (weather, user info, external data, etc.) to work together within a single conversation. For example:
+`rag` is a node in the Graph, invoked by `intent_router` based on intent classification. This design allows RAG and other nodes (weather, user info, external data, etc.) to work in parallel. For example:
 
 > "How should I maintain my robot vacuum given the temperature in my area?"
-> → The Agent first calls `get_user_location` to get the city → calls `get_weather` to get the temperature → calls `rag_summarize` to retrieve maintenance knowledge → synthesizes and generates a comprehensive answer
+> → `intent_router` classifies as `complex` → parallel execution of `get_location`, `rag`, `get_user_id`, `get_month` → all paths converge at `synthesize` → generates comprehensive response
 
 ### Miscellaneous
 
-- **Models**: LLM uses Anthropic Claude (`claude-sonnet-4-6`), Embedding uses OpenAI (`text-embedding-3-small`), both managed via a unified factory class
+- **Models**: LLM uses Anthropic Claude (`claude-sonnet-4-6`), Embedding uses OpenAI (`text-embedding-3-small`)
 - **Configuration**: All parameters are managed through YAML files (`config/`), with zero hardcoding in business logic
 - **Logging**: Unified logging module with date-based rolling file output to `logs/`
 - **Frontend**: Streamlit provides the interactive UI
@@ -62,12 +70,17 @@ Cross-cutting logic is injected into the Agent's execution pipeline via the Lang
 
 ```
 .
-├── app.py                  # Streamlit entry point
+├── app.py                  # Streamlit entry point, invokes workflow graph
+├── graph.png               # Auto-generated workflow graph from LangGraph
+├── graph_architecture.md   # Architecture design document
 ├── agent/
-│   ├── react_agent.py      # ReAct Agent definition
+│   ├── state.py            # GraphState / QueryClassification definitions
+│   ├── nodes.py            # Graph node functions (intent routing, tool calls, synthesis)
+│   ├── workflow.py         # StateGraph assembly and compilation
+│   ├── react_agent.py      # Original ReAct Agent (deprecated)
 │   └── tools/
-│       ├── agent_tools.py  # Tool definitions
-│       └── middleware.py   # Middleware definitions
+│       ├── agent_tools.py  # Business tools (@tool decorated)
+│       └── middleware.py   # Original Middleware (deprecated, logic inlined into nodes.py)
 ├── rag/
 │   ├── rag_service.py      # RAG retrieval and generation chain
 │   └── vector_store.py     # ChromaDB vector store and document ingestion
@@ -106,12 +119,6 @@ Place `.txt` or `.pdf` documents in the `data/` directory. Vectorization and ing
 
 ```bash
 streamlit run app.py
-```
-
-**Run the Agent directly from the command line:**
-
-```bash
-python -m agent.react_agent
 ```
 
 **Test RAG retrieval only:**

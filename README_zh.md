@@ -1,11 +1,28 @@
 [English](README.md) | [中文](README_zh.md)
 # RAG + Agent 智能问答系统
 
-基于 LangChain Agent + RAG 构建的智能问答系统，以扫地机器人知识库为示例场景，演示如何将检索增强生成（RAG）与 ReAct Agent 结合，实现具备工具调用、上下文感知和动态提示词切换能力的对话助手。
+基于 LangChain Agent + LangGraph + RAG 构建的智能问答系统，以扫地机器人知识库为示例场景，演示如何将检索增强生成（RAG）与 Graph 化的 Agent 工作流结合，实现具备意图路由、工具调用、上下文感知和动态提示词切换能力的对话助手。
+
+---
+
+## 架构概览
+
+系统采用 LangGraph StateGraph 架构，通过显式的图节点和边替代原 ReAct Agent 的隐式工具调用链，使执行路径可控、可审计。
+
+![Workflow Graph](./graph.png)
+
+详细架构设计参见 [graph_architecture.md](graph_architecture.md)。
 
 ---
 
 ## 技术要点
+
+### LangGraph Workflow
+
+- 使用 `StateGraph` 定义节点和边，`intent_router` 通过 LLM 结构化输出分类用户意图
+- 四种意图路径：天气查询（`weather`）、使用报告（`report`）、产品知识（`product`）、复合查询（`complex`）
+- 通过 `Command(goto=...)` 实现动态路由，支持并行节点调度
+- 所有路径最终汇聚到 `synthesize` 节点生成回答
 
 ### RAG 离线文档入库
 
@@ -18,40 +35,31 @@
 
 - 每次查询通过 ChromaDB retriever 检索 Top-K 相关文档片段（K 可配置）
 - 检索结果拼接为结构化 context，注入 RAG Prompt Template，由 LLM 生成最终答案
-- RAG 能力以 LangChain `@tool` 形式封装，供 Agent 按需调用
+- RAG 能力以 LangChain `@tool` 形式封装，作为图节点 `rag` 按需调用
 
-### LangChain Tool 封装
+### Graph 节点
 
-Agent 配备以下工具：
-
-| 工具 | 说明 |
+| 节点 | 说明 |
 |------|------|
-| `rag_summarize` | 基于 RAG 检索知识库并生成摘要回答 |
-| `get_weather` | 获取指定城市的天气信息 |
-| `get_user_location` | 获取用户所在城市 |
+| `intent_router` | LLM 意图分类，动态路由到对应节点 |
+| `get_location` | 根据 IP 获取用户城市/经纬度 |
+| `get_weather` | 根据经纬度获取天气信息 |
 | `get_user_id` | 获取当前用户 ID |
-| `get_current_month` | 获取当前月份 |
-| `fetch_external_data` | 根据用户 ID 和月份读取外部业务数据（CSV） |
-| `fill_context_for_report` | 触发报告模式上下文标记 |
-
-### Middleware 中间件
-
-通过 LangChain Agent Middleware 机制在 Agent 运行链路中注入横切逻辑：
-
-- **`monitor_tool`**（`@wrap_tool_call`）：拦截所有工具调用，记录工具名称与入参；当 `fill_context_for_report` 被调用时，向运行时 context 写入报告标记
-- **`log_before_model`**（`@before_model`）：在每次 LLM 调用前记录当前消息数量及最新消息内容
-- **`report_prompt_switch`**（`@dynamic_prompt`）：根据运行时 context 中的 `report` 标志动态切换系统提示词，实现普通对话与报告生成两种模式的运行时切换
+| `get_month` | 获取当前月份 |
+| `fetch_data` | 读取外部业务数据（CSV），触发报告模式 |
+| `rag` | 基于 RAG 检索知识库并生成摘要 |
+| `synthesize` | 汇总所有上下文，根据意图切换 prompt，生成最终回答 |
 
 ### RAG 与 Agent 结合
 
-`rag_summarize` 作为 Agent 的一个普通工具注册，Agent 在推理过程中自主判断是否需要检索知识库。这种设计使得 RAG 与其他工具（天气、用户信息、外部数据等）可以在同一次对话中协同工作，例如：
+`rag` 作为 Graph 中的一个节点，由 `intent_router` 按意图分类结果决定是否调用。这种设计使得 RAG 与其他节点（天气、用户信息、外部数据等）可以并行工作，例如：
 
 > "扫地机器人在我所在地区的气温下如何保养"
-> → Agent 先调用 `get_user_location` 获取城市 → 调用 `get_weather` 获取气温 → 调用 `rag_summarize` 检索保养知识 → 综合生成回答
+> → `intent_router` 判定为 `complex` → 并行执行 `get_location`、`rag`、`get_user_id`、`get_month` → 各路径完成后汇聚到 `synthesize` → 综合生成回答
 
 ### 其他
 
-- **模型**：LLM 使用 Anthropic Claude（`claude-sonnet-4-6`），Embedding 使用 OpenAI（`text-embedding-3-small`），均通过工厂类统一管理
+- **模型**：LLM 使用 Anthropic Claude（`claude-sonnet-4-6`），Embedding 使用 OpenAI（`text-embedding-3-small`）
 - **配置**：所有参数通过 YAML 文件管理（`config/`），业务代码零硬编码
 - **日志**：统一日志模块，按日期滚动写入 `logs/`
 - **前端**：使用 Streamlit 提供交互界面
@@ -62,12 +70,17 @@ Agent 配备以下工具：
 
 ```
 .
-├── app.py                  # Streamlit 入口
+├── app.py                  # Streamlit 入口，调用 workflow 执行图
+├── graph.png               # LangGraph 自动生成的工作流图
+├── graph_architecture.md   # 架构设计文档
 ├── agent/
-│   ├── react_agent.py      # ReAct Agent 定义
+│   ├── state.py            # GraphState / QueryClassification 定义
+│   ├── nodes.py            # 图节点函数（意图路由、工具调用、回答合成）
+│   ├── workflow.py         # StateGraph 组装与编译
+│   ├── react_agent.py      # 原 ReAct Agent（已弃用）
 │   └── tools/
-│       ├── agent_tools.py  # 工具定义
-│       └── middleware.py   # Middleware 定义
+│       ├── agent_tools.py  # 业务工具（@tool 装饰）
+│       └── middleware.py   # 原 Middleware（已弃用，逻辑内联到 nodes.py）
 ├── rag/
 │   ├── rag_service.py      # RAG 检索与生成链
 │   └── vector_store.py     # ChromaDB 向量存储与文档入库
@@ -106,12 +119,6 @@ export OPENAI_API_KEY=your_openai_api_key
 
 ```bash
 streamlit run app.py
-```
-
-**命令行直接运行 Agent：**
-
-```bash
-python -m agent.react_agent
 ```
 
 **仅测试 RAG 检索：**
