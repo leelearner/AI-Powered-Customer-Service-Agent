@@ -45,10 +45,19 @@ def rag_summarize(query: str) -> str:
     )
 )
 def get_weather(city: str, lat: str, lon: str) -> str:
-    api_key = "b66f07605fee74fc4d25e679b26c4f37"
+    api_key = agent_conf.get("openweather_api_key", None)
+    if not api_key or api_key.startswith("${"):
+        logger.error("OpenWeather API key is not configured.")
+        return "Weather information is currently unavailable."
+    logger.info(f"Get the api key for openweather: {api_key is not None}")
     resp = requests.get(
         f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude=hourly,daily&appid={api_key}"
     )
+    if resp.status_code != 200:
+        logger.error(
+            f"OpenWeather API request failed with status {resp.status_code}: {resp.text}"
+        )
+        return f"Unable to fetch weather data for {city}. Please try again later."
 
     data = resp.json()
     weather_desc = data["current"]["weather"][0]["description"]
