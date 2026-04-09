@@ -7,6 +7,7 @@ from rag.rag_service import RagSummarizeService
 import random
 from utils.config_handler import agent_conf
 from utils.path_tool import get_abs_path
+import requests
 
 user_ids = [str(i) for i in range(1001, 1011)]
 month_arr = [
@@ -43,22 +44,47 @@ def rag_summarize(query: str) -> str:
         "weather information of that city."
     )
 )
-def get_weather(city: str) -> str:
-    return (
-        f"city {city} weather is good today. The temperature is 25 degree Celsius."
-        "The humidity is 60%. The wind speed is 10 km/h."
-        "The possibility of rain is 20%."
+def get_weather_tool(city: str, lat: str, lon: str) -> str:
+    api_key = agent_conf.get("openweather_api_key", None)
+    if not api_key or api_key.startswith("${"):
+        logger.error("OpenWeather API key is not configured.")
+        return "Weather information is currently unavailable."
+    logger.info(f"Get the api key for openweather: {api_key is not None}")
+    resp = requests.get(
+        f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude=hourly,daily&appid={api_key}"
     )
+    if resp.status_code != 200:
+        logger.error(
+            f"OpenWeather API request failed with status {resp.status_code}: {resp.text}"
+        )
+        return f"Unable to fetch weather data for {city}. Please try again later."
+
+    data = resp.json()
+    weather_desc = data["current"]["weather"][0]["description"]
+    temp = data["current"]["temp"] - 273.15  # Convert from Kelvin to Celsius
+    humidity = data["current"]["humidity"]
+    return f"The current weather in {city} is {weather_desc} with a temperature of {temp}°C and humidity of {humidity}%."
 
 
-@tool(description="This tool is used to get the name of the user's city")
-def get_user_location() -> str:
-    return random.choice(["Beijing", "Shanghai", "Guangzhou", "Shenzhen"])
+@tool(
+    description="This tool is used to get the name of the user's city."
+    "The input should be the user's IP address,"
+    "and the output will be the 'city', 'lat' and 'lon' corresponding to that IP address.",
+)
+def get_user_location(ip: str) -> dict:
+    resp = requests.get(f"http://ip-api.com/json/{ip}")
+    data = resp.json()
+    res = {
+        "city": data.get("city", "unknown"),
+        "lat": data.get("lat", "unknown"),
+        "lon": data.get("lon", "unknown"),
+    }
+    return res
 
 
 @tool(description="Obtain the user id, return in string format")
-def get_user_id() -> str:
-    return str(random.randint(1000, 9999))
+def get_user_id_tool() -> str:
+    return random.choice(user_ids)
 
 
 @tool(

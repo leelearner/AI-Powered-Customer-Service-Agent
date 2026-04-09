@@ -1,1 +1,2 @@
 external_data_path: data/external/records.csv
+openweather_api_key: ${OPENWEATHER_API_KEY}
