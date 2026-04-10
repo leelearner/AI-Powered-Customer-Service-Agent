@@ -26,8 +26,6 @@ logs/
 # Vector store / ChromaDB
 chroma_db/
 
-# Data files (keep source docs, ignore generated/downloaded)
-data/external/
 
 # Model weights / large binaries
 *.bin
