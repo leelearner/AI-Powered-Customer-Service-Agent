@@ -30,7 +30,6 @@ chroma_db/
 data/external/
 
 # Model weights / large binaries
-model/
 *.bin
 *.gguf
 *.safetensors
