@@ -1,6 +1,6 @@
 from langchain_chroma import Chroma
 from utils.config_handler import chroma_conf
-from model.factory import embedding_model
+from chat.model.factory import embedding_model
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 import os

@@ -1,7 +1,7 @@
 from rag.vector_store import VectorStoreService
 from utils.prompt_loader import load_rag_prompt
 from langchain_core.prompts import PromptTemplate
-from model.factory import chat_model
+from chat.model.factory import chat_model
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 

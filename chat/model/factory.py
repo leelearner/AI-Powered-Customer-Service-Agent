@@ -3,7 +3,7 @@ from typing import Optional
 from chromadb import Embeddings
 from langchain.chat_models import BaseChatModel
 from langchain_anthropic import ChatAnthropic
-from chat.utils.config_handler import rag_conf
+from utils.config_handler import rag_conf
 from langchain_openai import OpenAIEmbeddings
 
 
