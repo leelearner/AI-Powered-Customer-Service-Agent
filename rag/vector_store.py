@@ -3,6 +3,9 @@ from utils.config_handler import chroma_conf
 from chat.model.factory import embedding_model
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+from langchain_classic.retrievers.bm25 import BM25Retriever
+from langchain_classic.retrievers.ensemble import EnsembleRetriever
+from langchain_classic.retrievers import ParentDocumentRetriever
 import os
 from utils.file_handler import (
     pdf_loader,
@@ -21,15 +24,51 @@ class VectorStoreService:
             embedding_function=embedding_model,
             persist_directory=chroma_conf["persist_directory"],
         )
+        # chunk_size 单位是字符数（非 token 数）
+        # 中文场景下 1 字符 ≈ 1.5–2 token，chunk_size=200 约对应 300–400 token
+        # 远小于 reranker 的 max_length=512，保持安全边距
         self.spliter = RecursiveCharacterTextSplitter(
             chunk_size=chroma_conf["chunk_size"],
             chunk_overlap=chroma_conf["chunk_overlap"],
             separators=chroma_conf["separators"],
-            length_function=len,
+            length_function=len,  # 按字符数切分，非 token 数
         )
+        self.all_documents: list[Document] = []
+        self._load_existing_documents()
+
+    def _load_existing_documents(self):
+        """从 Chroma 中读取已持久化的文档，用于重启后重建 BM25 索引"""
+        try:
+            existing = self.vector_store.get()
+            if existing and existing.get("documents"):
+                self.all_documents = [
+                    Document(page_content=doc, metadata=meta)
+                    for doc, meta in zip(existing["documents"], existing["metadatas"])
+                ]
+                logger.info(
+                    f"[Load existing documents] Loaded {len(self.all_documents)} documents from Chroma for BM25."
+                )
+        except Exception as e:
+            logger.warning(
+                f"[Load existing documents] Failed to load existing documents: {str(e)}"
+            )
 
     def get_retriever(self):
-        return self.vector_store.as_retriever(search_kwargs={"k": chroma_conf["k"]})
+        k = chroma_conf["k"]
+        vector_retriever = self.vector_store.as_retriever(search_kwargs={"k": k})
+
+        if self.all_documents:
+            bm25_retriever = BM25Retriever.from_documents(self.all_documents, k=k)
+            return EnsembleRetriever(
+                retrievers=[vector_retriever, bm25_retriever],
+                weights=[0.5, 0.5],
+            )
+
+        # 文档尚未加载时降级为纯向量检索
+        logger.warning(
+            "[get_retriever] No documents available for BM25, falling back to vector-only retrieval."
+        )
+        return vector_retriever
 
     def load_document(self):
         def check_md5_hex(md5_for_check: str):
@@ -92,6 +131,9 @@ class VectorStoreService:
                     continue
 
                 self.vector_store.add_documents(split_document)
+                self.all_documents.extend(
+                    split_document
+                )  # 同步更新内存副本供 BM25 使用
                 save_md5_hex(md5_hex)
 
                 logger.info(
