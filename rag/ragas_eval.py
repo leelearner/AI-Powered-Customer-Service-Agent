@@ -30,6 +30,7 @@ Usage:
     python -m rag.ragas_eval
 """
 
+import datetime
 import json
 import sys
 import os
@@ -152,12 +153,13 @@ class FallbackRagasLLM(BaseRagasLLM):
         for wrapper in self._wrappers:
             try:
                 return wrapper.generate_text(
-                    prompt, n=n, temperature=temperature,
-                    stop=stop, callbacks=callbacks
+                    prompt, n=n, temperature=temperature, stop=stop, callbacks=callbacks
                 )
             except _RATE_LIMIT_EXCEPTIONS as exc:
                 model_name = getattr(wrapper.langchain_llm, "model", "unknown")
-                logger.warning(f"Rate limit on [{model_name}], switching to next model...")
+                logger.warning(
+                    f"Rate limit on [{model_name}], switching to next model..."
+                )
                 last_exc = exc
         raise last_exc  # all models exhausted; let RAGAS's retry handle it
 
@@ -173,12 +175,13 @@ class FallbackRagasLLM(BaseRagasLLM):
         for wrapper in self._wrappers:
             try:
                 return await wrapper.agenerate_text(
-                    prompt, n=n, temperature=temperature,
-                    stop=stop, callbacks=callbacks
+                    prompt, n=n, temperature=temperature, stop=stop, callbacks=callbacks
                 )
             except _RATE_LIMIT_EXCEPTIONS as exc:
                 model_name = getattr(wrapper.langchain_llm, "model", "unknown")
-                logger.warning(f"Rate limit on [{model_name}], switching to next model...")
+                logger.warning(
+                    f"Rate limit on [{model_name}], switching to next model..."
+                )
                 last_exc = exc
         raise last_exc  # all models exhausted; let RAGAS's retry handle it
 
@@ -207,9 +210,11 @@ def build_ragas_llm_with_fallback() -> FallbackRagasLLM:
             logger.warning(f"  Skipping [{provider}] {model_name} — init failed: {exc}")
 
     if not wrappers:
-        raise RuntimeError("All candidate models failed to initialise; cannot build the judge LLM")
+        raise RuntimeError(
+            "All candidate models failed to initialise; cannot build the judge LLM"
+        )
 
-    names = [m for _, m in FALLBACK_MODELS[:len(wrappers)]]
+    names = [m for _, m in FALLBACK_MODELS[: len(wrappers)]]
     logger.info(f"  Fallback chain ready: {' -> '.join(names)}")
     return FallbackRagasLLM(wrappers)
 
@@ -422,7 +427,26 @@ def main():
 
     # Save per-sample scores for deeper analysis of which question types score poorly
     output_path = get_abs_path("rag/eval_results.csv")
+    output_path += f".{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
     scores_df.to_csv(output_path, index=False, encoding="utf-8-sig")
+    # 将平均值也存储到csv文件中
+    mean_scores = (
+        scores_df[
+            [
+                "faithfulness",
+                "answer_relevancy",
+                "context_precision",
+                "context_recall",
+            ]
+        ]
+        .mean()
+        .to_frame()
+        .T
+    )
+    mean_scores.to_csv(
+        output_path.replace(".csv", ".mean.csv"), index=False, encoding="utf-8-sig"
+    )
+
     print(f"\nDetailed results saved to: {output_path}")
     print("=" * 60)
 

@@ -4,11 +4,11 @@ k: 15
 data_path: data
 md5_hex_store: md5.text
 allow_knowledge_file_type: [".txt", ".pdf"]
-chunk_size: 200
-chunk_overlap: 50
-# parent_chunk_size: 800
-# parent_chunk_overlap: 100 
-# child_chunk_size: 200
-# child_chunk_overlap: 50
+# chunk_size: 200
+# chunk_overlap: 50
+parent_chunk_size: 800
+parent_chunk_overlap: 100 
+child_chunk_size: 200
+child_chunk_overlap: 50
 
 separators: ["\n\n", "\n", "。", "；", ";", "!", "?", ".", "！", "？", " ", ""]

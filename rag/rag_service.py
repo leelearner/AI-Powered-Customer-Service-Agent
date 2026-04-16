@@ -46,6 +46,8 @@ class RagSummarizeService:
         return self.retriever.invoke(query)
 
     def bge_rerank(self, query: str, docs: list[Document]):
+        if not docs:
+            return []
         pairs = [(query, doc.page_content) for doc in docs]
         with torch.no_grad():
             inputs = self.reranker_tokenizer(
