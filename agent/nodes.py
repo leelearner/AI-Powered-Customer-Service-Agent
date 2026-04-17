@@ -38,13 +38,13 @@ def intent_router(
             expected = 1
         elif classification["intent"] == "report":
             goto = ["get_user_id", "get_month"]
-            expected = 2
+            expected = 1  # get_user_id+get_month deduplicate at fetch_data → join called once
         elif classification["intent"] == "product":
             goto = "rag"
             expected = 1
         else:
             goto = ["get_location", "rag", "get_user_id", "get_month"]
-            expected = 4
+            expected = 3  # get_weather→join, rag→join, fetch_data(merged)→join
     else:
         logger.warning(
             f"LLM returned unexpected classification format: {classification}"
@@ -124,12 +124,22 @@ def rag_node(state: GraphState) -> Command:
 
 
 def join_node(state: GraphState) -> Command | dict:
-    """Barrier node: wait for all parallel branches before synthesizing."""
-    current = state.get("completed_branches") or 0
-    expected = state.get("expected_branches") or 1
-    if current + 1 >= expected:
-        return Command(update={"completed_branches": 1}, goto="synthesize")
-    return {"completed_branches": 1}
+    """Barrier node: proceed to synthesize only when all required data for the intent is ready."""
+    intent = state.get("classification", {}).get("intent", "")
+
+    needs_weather = intent in ("weather", "complex")
+    needs_rag = intent in ("product", "complex")
+    needs_data = intent in ("report", "complex")
+
+    all_ready = (
+        (not needs_weather or bool(state.get("weather")))
+        and (not needs_rag or bool(state.get("rag_result")))
+        and (not needs_data or bool(state.get("external_data")))
+    )
+
+    if all_ready:
+        return Command(goto="synthesize")
+    return {}
 
 
 def synthesize_node(state: GraphState) -> dict:
