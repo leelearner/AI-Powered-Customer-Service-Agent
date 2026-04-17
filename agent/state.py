@@ -1,10 +1,14 @@
-from typing import TypedDict, Literal
+from typing import Annotated, TypedDict, Literal
 
 
 class QueryClassification(TypedDict):
     intent: Literal["weather", "report", "product", "complex"]
     topic: str
     summary: str
+
+
+def _add(a, b):
+    return (a or 0) + (b or 0)
 
 
 class GraphState(TypedDict):
@@ -22,3 +26,6 @@ class GraphState(TypedDict):
     final_response: str
     # classification result
     classification: QueryClassification
+    # fan-in barrier
+    expected_branches: int
+    completed_branches: Annotated[int, _add]

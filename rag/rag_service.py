@@ -39,7 +39,8 @@ class RagSummarizeService:
         self.retriever = self.vector_store.get_retriever()
 
     def __init__chain(self):
-        chain = self.prompt_template | print_prompt | self.model | StrOutputParser()
+        # chain = self.prompt_template | print_prompt | self.model | StrOutputParser()
+        chain = self.prompt_template
         return chain
 
     def retriever_docs(self, query: str) -> list[Document]:

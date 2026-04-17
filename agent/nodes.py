@@ -35,23 +35,31 @@ def intent_router(
     if isinstance(classification, dict):
         if classification["intent"] == "weather":
             goto = "get_location"
+            expected = 1
         elif classification["intent"] == "report":
             goto = ["get_user_id", "get_month"]
+            expected = 2
         elif classification["intent"] == "product":
             goto = "rag"
+            expected = 1
         else:
             goto = ["get_location", "rag", "get_user_id", "get_month"]
+            expected = 4
     else:
         logger.warning(
             f"LLM returned unexpected classification format: {classification}"
         )
         goto = "rag"
+        expected = 1
 
     logger.info(
         f"Query classified as intent: {goto} with topic: {classification.get('topic', '')}"
     )
 
-    return Command(update={"classification": classification}, goto=goto)
+    return Command(
+        update={"classification": classification, "expected_branches": expected, "completed_branches": 0},
+        goto=goto,
+    )
 
 
 def get_location(state: GraphState) -> Command:
@@ -70,7 +78,7 @@ def get_weather(state: GraphState) -> Command:
             "lon": str(location["lon"]),
         }
     )
-    return Command(update={"weather": weather}, goto="synthesize")
+    return Command(update={"weather": weather}, goto="join")
 
 
 def get_user_id(state: GraphState) -> Command:
@@ -104,7 +112,7 @@ def fetch_data_node(state: GraphState) -> Command:
 
     return Command(
         update={"external_data": external, "is_report": is_report},
-        goto="synthesize",
+        goto="join",
     )
 
 
@@ -112,7 +120,16 @@ def rag_node(state: GraphState) -> Command:
     """Node to retrieve relevant knowledge via RAG."""
     result = rag_summarize.invoke({"query": state["query"]})
     logger.info(f"RAG retrieval completed for query: {state['query']}")
-    return Command(update={"rag_result": result}, goto="synthesize")
+    return Command(update={"rag_result": result}, goto="join")
+
+
+def join_node(state: GraphState) -> Command | dict:
+    """Barrier node: wait for all parallel branches before synthesizing."""
+    current = state.get("completed_branches") or 0
+    expected = state.get("expected_branches") or 1
+    if current + 1 >= expected:
+        return Command(update={"completed_branches": 1}, goto="synthesize")
+    return {"completed_branches": 1}
 
 
 def synthesize_node(state: GraphState) -> dict:

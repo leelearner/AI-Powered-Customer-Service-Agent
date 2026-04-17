@@ -8,6 +8,7 @@ from agent.nodes import (
     get_month,
     fetch_data_node,
     rag_node,
+    join_node,
     synthesize_node,
 )
 
@@ -24,6 +25,7 @@ def build_workflow():
     graph.add_node("get_month", get_month)
     graph.add_node("fetch_data", fetch_data_node)
     graph.add_node("rag", rag_node)
+    graph.add_node("join", join_node)
     graph.add_node("synthesize", synthesize_node)
 
     # Entry point
