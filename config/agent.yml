@@ -1,2 +1,13 @@
 external_data_path: data/external/records.csv
 openweather_api_key: ${OPENWEATHER_API_KEY}
+
+# How many trailing conversation messages to feed into intent classification
+# and final synthesis (one turn == 2 messages: human + ai).
+history_max_messages: 6
+
+# Timeout for outbound HTTP calls (IP geolocation, weather).
+http_timeout_seconds: 5
+
+# Classifier self-reported confidence below this escalates routing to the
+# `complex` fan-out: better to spend an extra call than to answer off-path.
+classification_confidence_threshold: 0.6

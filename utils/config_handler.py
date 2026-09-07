@@ -19,8 +19,8 @@ def resolve_env_vars(config):
     return config
 
 
-def load_rag_config(
-    config_path: str = get_abs_path("config/rag.yml"), encoding: str = "utf-8"
+def load_models_config(
+    config_path: str = get_abs_path("config/models.yml"), encoding: str = "utf-8"
 ) -> dict:
     with open(config_path, "r", encoding=encoding) as file:
         config = yaml.load(file, Loader=yaml.FullLoader)
@@ -51,10 +51,10 @@ def load_agent_config(
         return resolve_env_vars(config)
 
 
-rag_conf = load_rag_config()
+models_conf = load_models_config()
 chroma_conf = load_chroma_config()
 prompts_conf = load_prompts_config()
 agent_conf = load_agent_config()
 
 if __name__ == "__main__":
-    print(rag_conf["chat_model_name"])
+    print(models_conf["synthesis"]["name"])

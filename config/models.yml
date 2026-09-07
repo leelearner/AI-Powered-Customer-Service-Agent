@@ -1,0 +1,37 @@
+# Model selection per role. Every LLM call in the project resolves its model here;
+# nothing constructs a client with an inline model name.
+#
+# Pricing per MTok (input/output) for reference when tuning:
+#   claude-opus-5    $5 / $25      claude-sonnet-5  $2 / $10
+#   claude-haiku-4-5 $1 / $5       claude-sonnet-4-6 $3 / $15
+# Model IDs never carry a date suffix.
+
+# `temperature` is OPTIONAL and model-gated: the current Opus/Sonnet generation
+# rejects sampling params with a 400 ("temperature ... removed"), while Haiku still
+# accepts them. Omit the key for Opus/Sonnet roles; the factory only sends it when
+# present. Re-add it if you switch a role back to Haiku or an older model.
+
+# Final answer generation. Quality matters most here — it is what the user reads.
+synthesis:
+  name: claude-opus-5
+
+# Intent classification + query rewrite. A short structured output on every turn,
+# so it runs on the cheapest capable model at temperature 0 (a discriminative task,
+# not a creative one). This also cuts time-to-first-token.
+classification:
+  name: claude-haiku-4-5
+  temperature: 0
+
+# Compresses retrieved chunks into grounded facts before synthesis.
+rag:
+  name: claude-opus-5
+
+embedding:
+  name: text-embedding-3-small
+
+# Shared client settings.
+# max_tokens must leave room for BOTH thinking and the visible answer: Opus 5 runs
+# adaptive thinking by default, and a budget consumed by thinking yields a turn with
+# no text at all.
+request_timeout_seconds: 120
+max_tokens: 16000

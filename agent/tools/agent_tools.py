@@ -3,11 +3,38 @@ from utils.logger_handler import logger
 
 from langchain_core.tools import tool
 
-from rag.rag_service import RagSummarizeService
+from rag.rag_service import get_rag_service
 import random
 from utils.config_handler import agent_conf
 from utils.path_tool import get_abs_path
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+HTTP_TIMEOUT = agent_conf.get("http_timeout_seconds", 5)
+
+
+def _build_http_session() -> requests.Session:
+    """Session that retries transient failures before giving up.
+
+    Retry belongs here rather than on the graph node: the node-level degradation
+    decorator catches exceptions inside the node, so LangGraph's retry_policy —
+    which wraps from the outside — would never see them.
+    """
+    session = requests.Session()
+    retry = Retry(
+        total=2,
+        backoff_factor=0.5,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset(["GET"]),
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+http_session = _build_http_session()
 
 user_ids = [str(i) for i in range(1001, 1011)]
 month_arr = [
@@ -33,8 +60,7 @@ external_data = {}
     "summarized answer based on the knowledge in the vector store."
 )
 def rag_summarize(query: str) -> str:
-    rag_service = RagSummarizeService()
-    return rag_service.rag_summarize(query)
+    return get_rag_service().rag_summarize(query)
 
 
 @tool(
@@ -50,19 +76,30 @@ def get_weather_tool(city: str, lat: str, lon: str) -> str:
         logger.error("OpenWeather API key is not configured.")
         return "Weather information is currently unavailable."
     logger.info(f"Get the api key for openweather: {api_key is not None}")
-    resp = requests.get(
-        f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude=hourly,daily&appid={api_key}"
-    )
+    try:
+        resp = http_session.get(
+            f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude=hourly,daily&appid={api_key}",
+            timeout=HTTP_TIMEOUT,
+        )
+    except requests.RequestException as e:
+        logger.error(f"OpenWeather API request failed: {e}")
+        return f"Unable to fetch weather data for {city}. Please try again later."
+
     if resp.status_code != 200:
         logger.error(
             f"OpenWeather API request failed with status {resp.status_code}: {resp.text}"
         )
         return f"Unable to fetch weather data for {city}. Please try again later."
 
-    data = resp.json()
-    weather_desc = data["current"]["weather"][0]["description"]
-    temp = data["current"]["temp"] - 273.15  # Convert from Kelvin to Celsius
-    humidity = data["current"]["humidity"]
+    try:
+        data = resp.json()
+        weather_desc = data["current"]["weather"][0]["description"]
+        temp = data["current"]["temp"] - 273.15  # Convert from Kelvin to Celsius
+        humidity = data["current"]["humidity"]
+    except (ValueError, KeyError, IndexError) as e:
+        logger.error(f"Unexpected OpenWeather response shape: {e}")
+        return f"Unable to fetch weather data for {city}. Please try again later."
+
     return f"The current weather in {city} is {weather_desc} with a temperature of {temp}°C and humidity of {humidity}%."
 
 
@@ -72,16 +109,25 @@ def get_weather_tool(city: str, lat: str, lon: str) -> str:
     "and the output will be the 'city', 'lat' and 'lon' corresponding to that IP address.",
 )
 def get_user_location(ip: str) -> dict:
-    resp = requests.get(f"http://ip-api.com/json/{ip}")
-    data = resp.json()
-    res = {
+    unknown = {"city": "unknown", "lat": "", "lon": ""}
+    try:
+        resp = http_session.get(f"http://ip-api.com/json/{ip}", timeout=HTTP_TIMEOUT)
+        data = resp.json()
+    except (requests.RequestException, ValueError) as e:
+        logger.error(f"IP geolocation lookup failed for {ip}: {e}")
+        return unknown
+
+    return {
         "city": data.get("city", "unknown"),
-        "lat": data.get("lat", "unknown"),
-        "lon": data.get("lon", "unknown"),
+        "lat": data.get("lat", ""),
+        "lon": data.get("lon", ""),
     }
-    return res
 
 
+# DEPRECATED: the graph no longer calls these three. They returned a random user
+# and a random month, so "my June report" could return another user's March data.
+# `get_user_id` now reads the session's selected user and `get_month` uses the month
+# extracted from the query. Kept for reference, as with react_agent.py / middleware.py.
 @tool(description="Obtain the user id, return in string format")
 def get_user_id_tool() -> str:
     return random.choice(user_ids)
@@ -128,6 +174,26 @@ def generate_external_data():
                     "consumables": consumables,
                     "comparison": comparison,
                 }
+
+
+def available_user_ids() -> list[str]:
+    """User ids actually present in the external data, sorted."""
+    generate_external_data()
+    return sorted(external_data.keys())
+
+
+def available_months(user_id: str = "") -> list[str]:
+    """Months present in the external data, sorted ascending.
+
+    Scoped to one user when given, otherwise the union across all users.
+    """
+    generate_external_data()
+    if user_id and user_id in external_data:
+        return sorted(external_data[user_id].keys())
+    months: set[str] = set()
+    for record in external_data.values():
+        months.update(record.keys())
+    return sorted(months)
 
 
 @tool(

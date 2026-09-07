@@ -1,17 +1,17 @@
+from functools import lru_cache
+
 from rag.vector_store import VectorStoreService
 from utils.prompt_loader import load_rag_prompt
 from langchain_core.prompts import PromptTemplate
-from chat.model.factory import chat_model
+from chat.model.factory import rag_model
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-import torch
+from utils.logger_handler import logger
 
 
-def print_prompt(prompt):
-    print("========== Prompt Start ==========")
-    print(prompt.to_string())
-    print("========== Prompt End ==========")
+def log_prompt(prompt):
+    """Trace the fully rendered RAG prompt without writing to stdout."""
+    logger.debug("RAG prompt:\n%s", prompt.to_string())
     return prompt
 
 
@@ -20,28 +20,20 @@ class RagSummarizeService:
         self.vector_store = VectorStoreService()
         self.prompt_text = load_rag_prompt()
         self.prompt_template = PromptTemplate.from_template(self.prompt_text)
-        self.model = chat_model
+        self.model = rag_model
         self.chain = self.__init__chain()
-        self.reranker_tokenizer = AutoTokenizer.from_pretrained(
-            "BAAI/bge-reranker-v2-m3"
-        )
-        self.reranker_model = (
-            AutoModelForSequenceClassification.from_pretrained(
-                "BAAI/bge-reranker-v2-m3"
-            )
-            .half()
-            .cuda()
-            .eval()
-        )
-
-        # 先加载文档（更新 all_documents），再构建包含 BM25 的混合检索器
-        self.vector_store.load_document()
-        self.retriever = self.vector_store.get_retriever()
 
     def __init__chain(self):
-        # chain = self.prompt_template | print_prompt | self.model | StrOutputParser()
-        chain = self.prompt_template
+        chain = self.prompt_template | log_prompt | self.model | StrOutputParser()
         return chain
+
+    def ingest(self):
+        """Load new knowledge documents into the vector store.
+
+        Kept out of __init__ so constructing the service has no disk-scanning side
+        effect. Call it once at startup, not per query.
+        """
+        self.vector_store.load_document()
 
     def retriever_docs(self, query: str) -> list[Document]:
         return self.retriever.invoke(query)
@@ -87,6 +79,17 @@ class RagSummarizeService:
         )
 
 
+@lru_cache(maxsize=1)
+def get_rag_service() -> RagSummarizeService:
+    """Process-wide singleton.
+
+    Building the service opens the vector store and compiles the chain; doing that
+    per query also re-scanned data/ and re-hashed every file.
+    """
+    return RagSummarizeService()
+
+
 if __name__ == "__main__":
-    rag_service = RagSummarizeService()
+    rag_service = get_rag_service()
+    rag_service.ingest()
     print(rag_service.rag_summarize("小户型适合哪些扫地机器人？"))
